@@ -63,7 +63,11 @@ class ConvLSTMCell(nn.Module):
         c_next = f * c_cur + i * g
         h_next = o * torch.tanh(c_next)
         # 计算下一个c_n h_n
+        print('h_next,c_next维度是：')
+        print(h_next.shape)
+        print(c_next.shape)
         return h_next, c_next
+        # c_n h_n的维度是(batch_size, hidden_dim, height, width)
 
     def init_hidden(self, batch_size, image_size):
         # 初始化c_n和h_n
@@ -139,7 +143,8 @@ class ConvLSTM(nn.Module):
         # 使用的时候就用cell_list[0], cell_list[1], ... cell_list[num_layers]
 
     def forward(self, input_tensor, hidden_state=None):
-        # input_tensor的维度是(time_stamp, batch_size, channel, height, width)
+        # print('input_tensor_dim:',input_tensor.shape)
+        # input_tensor的维度是(time_stamp, batch_size, channel, height, width) (time_stamp就是seq_len)
         # 如果batch_first = True, 那么就是(batch_size, time_stamp, channel, height, width)
         """
 
@@ -157,7 +162,7 @@ class ConvLSTM(nn.Module):
         if not self.batch_first:
             # (t, b, c, h, w) -> (b, t, c, h, w)
             input_tensor = input_tensor.permute(1, 0, 2, 3, 4)
-        # 如果batch_first 对维度进行处理
+        # 如果没有batch_first 那就处理成batch_first的情况
 
         b, _, _, h, w = input_tensor.size()
 
@@ -178,6 +183,8 @@ class ConvLSTM(nn.Module):
         cur_layer_input = input_tensor
 
         for layer_idx in range(self.num_layers):
+            # print('in layer %d the tensor shape:' % (layer_idx))
+            # print(cur_layer_input.shape)
 
             h, c = hidden_state[layer_idx]
             # 首先取第num_layers层的初始化hidden 和 cell
@@ -188,9 +195,11 @@ class ConvLSTM(nn.Module):
                                                  cur_state=[h, c])
                 # 使用cell_list中当前num_layers的convLSTMCell进行计算 得到h 和 c
                 output_inner.append(h)
-
+                # output_inner维度是[seq_len(time)]的 list 每个元素的维度是 (batch_size, 这一层的hidden_dim, height, width)
+                # 没问题就是convLSTMCell的h_n的维度
             layer_output = torch.stack(output_inner, dim=1)
-            # layer_output在第二维 dim=1处和output_inner维度相同 是五维向量
+            # stack之后 layer_output的维度是(batch_size, seq_len, 这一层的hidden_dim, height, width)
+            # 等于在dim=1的位置加了一维 长度是list的长度 也就是seq_len
             cur_layer_input = layer_output
             # 把上一次的五维输出向量作为下一层的输入(cur_layer_input)
 
